@@ -59,8 +59,22 @@ def get_data():
         raw_bodies = [user.sun, user.moon, user.mercury, user.venus, user.mars,
                       user.jupiter, user.saturn, user.uranus, user.neptune, user.pluto,
                       user.chiron, user.true_node, user.first_house, user.tenth_house]
-        
-        planets_data = [{"name": p.name, "sign": p.sign, "angle": p.abs_pos, "house": p.house} for p in raw_bodies]
+
+        # 星體名稱中英對照表 (後端映射)
+        planet_name_mapping = {
+            "True_Node": "北交點",
+            # 其他星體名稱保持原樣
+        }
+
+        planets_data = []
+        for p in raw_bodies:
+            mapped_name = planet_name_mapping.get(p.name, p.name)
+            planets_data.append({
+                "name": mapped_name,
+                "sign": p.sign,
+                "angle": p.abs_pos,
+                "house": p.house
+            })
         
         raw_houses = [user.first_house, user.second_house, user.third_house, user.fourth_house,
                       user.fifth_house, user.sixth_house, user.seventh_house, user.eighth_house,
@@ -148,3 +162,5 @@ def analyze_big_three():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
+
