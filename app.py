@@ -13,7 +13,7 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "你的_AIza_Key_填在這裡_方�
 genai.configure(api_key=GEMINI_KEY)
 
 # 使用 Gemini 2.5 Flash Lite 模型 (速度快、免費額度高)
-model = genai.GenerativeModel('google/gemma-3-27b-it')
+model = genai.GenerativeModel('gemma-3-27b-it')
 
 def calculate_custom_aspects(bodies_data):
     # ... (保留原本的相位計算邏輯) ...
@@ -162,6 +162,7 @@ def analyze_big_three():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
 
