@@ -4,6 +4,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kerykeion import AstrologicalSubject
 
+@app.route('/')
+def home():
+    return "Kit Astrology API is Running!", 200
+
 app = Flask(__name__)
 CORS(app)
 
@@ -162,6 +166,7 @@ def analyze_big_three():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
 
