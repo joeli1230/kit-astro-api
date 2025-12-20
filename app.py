@@ -1,26 +1,4 @@
 import os
-import sys
-
-# ==========================================
-# 【終極修復】搬家大法
-# Vercel 的預設目錄 /var/task 是唯讀的
-# 我們直接把工作目錄切換到 /tmp，解決 '/var/task/cache' 報錯
-# ==========================================
-
-# 1. 確保 /tmp 存在
-if not os.path.exists("/tmp"):
-    os.makedirs("/tmp")
-
-# 2. 【關鍵】把當前工作目錄改成 /tmp
-# 這樣任何嘗試寫入 "./cache" 的動作都會變成寫入 "/tmp/cache" (這是允許的)
-os.chdir("/tmp")
-
-# 3. 設定環境變數，雙重保險
-os.environ["HOME"] = "/tmp"
-os.environ["SE_EPHE_PATH"] = "/tmp"
-
-# ------------------------------------------
-
 import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -34,19 +12,8 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_KEY)
 
-# 設定模型 (包含備用方案)
-PRIMARY_MODEL = 'gemma-3-27b-it'
-FALLBACK_MODEL = 'gemini-1.5-flash'
-
-def get_ai_model():
-    try:
-        # 嘗試載入主要模型
-        return genai.GenerativeModel(PRIMARY_MODEL)
-    except:
-        # 失敗則回退到 Flash
-        return genai.GenerativeModel(FALLBACK_MODEL)
-
-model = get_ai_model()
+# 使用模型
+model = genai.GenerativeModel('gemma-3-27b-it')
 
 def calculate_custom_aspects(bodies_data):
     aspects = []
@@ -80,9 +47,6 @@ def calculate_custom_aspects(bodies_data):
 def get_data():
     try:
         data = request.json
-        if not data:
-            return jsonify({"status": "error", "message": "No JSON data received"}), 400
-
         user = AstrologicalSubject(
             data.get('name', 'Guest'),
             int(data.get('year')), int(data.get('month')), int(data.get('day')),
@@ -117,12 +81,8 @@ def get_data():
             "aspects": aspects_data,
             "houses": houses_data
         })
-
     except Exception as e:
-        # 印出錯誤到 Vercel Logs
-        print(f"CRITICAL ERROR in get-data: {str(e)}")
-        # 回傳詳細錯誤
-        return jsonify({"status": "error", "message": f"Server Error: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/api/analyze-big-three', methods=['POST'])
 def analyze_big_three():
@@ -157,24 +117,15 @@ def analyze_big_three():
 2. (建議二)
 (結語，一句溫暖的話)
 """
-        try:
-            # 嘗試生成內容
-            response = model.generate_content(prompt)
-            return jsonify({"status": "success", "analysis": response.text})
-        except Exception as ai_error:
-            # 如果主要模型 (Gemma) 失敗，改用 Flash
-            print(f"Primary model failed: {ai_error}, using fallback...")
-            fallback = genai.GenerativeModel(FALLBACK_MODEL)
-            response = fallback.generate_content(prompt)
-            return jsonify({"status": "success", "analysis": response.text})
+        response = model.generate_content(prompt)
+        return jsonify({"status": "success", "analysis": response.text})
 
     except Exception as e:
-        print(f"AI ERROR: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/')
 def home():
-    return "Kit Astrology API is Running! (Read-only fix applied)", 200
+    return "Kit Astrology API is Running on Render!", 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
