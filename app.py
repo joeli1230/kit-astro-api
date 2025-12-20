@@ -7,7 +7,7 @@ from kerykeion import AstrologicalSubject
 
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # --- 設定 Gemini API ---
 # 從環境變數獲取 Key (在 Render 設定)，本地測試可暫時寫死但不要上傳
@@ -168,6 +168,7 @@ def home():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
 
 
 
