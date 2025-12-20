@@ -1,20 +1,25 @@
 import os
+import sys
+
+# 【關鍵修復】Vercel 是唯讀系統，必須強制將緩存路徑指像 /tmp
+# 這不會影響你的功能，只是避免伺服器因為無法寫入檔案而崩潰
+os.environ["HOME"] = "/tmp"
+os.environ["SE_EPHE_PATH"] = "/tmp"
+
 import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kerykeion import AstrologicalSubject
 
-
-
 app = Flask(__name__)
+# 允許所有來源連線，解決 CORS 問題
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # --- 設定 Gemini API ---
-# 從環境變數獲取 Key (在 Render 設定)，本地測試可暫時寫死但不要上傳
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "你的_AIza_Key_填在這裡_方便本地測試")
 genai.configure(api_key=GEMINI_KEY)
 
-# 使用 Gemini 2.5 Flash Lite 模型 (速度快、免費額度高)
+# --- 保留你指定的模型 Gemma 3 27B IT ---
 model = genai.GenerativeModel('gemma-3-27b-it')
 
 def calculate_custom_aspects(bodies_data):
@@ -48,7 +53,6 @@ def calculate_custom_aspects(bodies_data):
 
 @app.route('/api/get-data', methods=['POST'])
 def get_data():
-    # ... (這部分邏輯不變，負責算星星位置) ...
     data = request.json
     try:
         user = AstrologicalSubject(
@@ -99,6 +103,8 @@ def get_data():
             "houses": houses_data
         })
     except Exception as e:
+        # 印出錯誤到 Vercel Log 方便除錯
+        print(f"Error in get-data: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 400
 
 @app.route('/api/analyze-big-three', methods=['POST'])
@@ -117,7 +123,7 @@ def analyze_big_three():
         moon_sign = user.moon.sign
         asc_sign = user.first_house.sign
 
-        # 2. 準備 Prompt (Gemini 不需要 System Role，直接寫在一起即可)
+        # 2. 準備 Prompt
         prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
 
@@ -144,7 +150,7 @@ def analyze_big_three():
 
         print("正在呼叫 Google Gemini API...")
         
-        # 3. 呼叫 Gemini
+        # 3. 呼叫 Gemini (使用你指定的 gemma-3-27b-it)
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
@@ -168,12 +174,3 @@ def home():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-
-
-
-
-
-
-
-
-
