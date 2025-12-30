@@ -95,9 +95,28 @@ def analyze_big_three():
             data.get('city', 'Hong Kong'), "HK"
         )
         
-        sun_sign = user.sun.sign
-        moon_sign = user.moon.sign
-        asc_sign = user.first_house.sign
+        # --- [修改部分開始] 增加星座中英文對照表 ---
+        ZODIAC_CN = {
+            "Aries": "白羊座",
+            "Taurus": "金牛座",
+            "Gemini": "雙子座",
+            "Cancer": "巨蟹座",
+            "Leo": "獅子座",
+            "Virgo": "處女座",
+            "Libra": "天秤座",
+            "Scorpio": "天蠍座",
+            "Sagittarius": "射手座",
+            "Capricorn": "摩羯座",
+            "Aquarius": "水瓶座",
+            "Pisces": "雙魚座"
+        }
+
+        # 先獲取原始英文名稱，再轉換成中文
+        # 如果字典裡找不到（例如出錯），就用回英文原文，避免程式崩潰
+        sun_sign = ZODIAC_CN.get(user.sun.sign, user.sun.sign)
+        moon_sign = ZODIAC_CN.get(user.moon.sign, user.moon.sign)
+        asc_sign = ZODIAC_CN.get(user.first_house.sign, user.first_house.sign)
+        # --- [修改部分結束] ---
 
         prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
