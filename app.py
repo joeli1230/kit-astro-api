@@ -9,6 +9,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # --- 設定 Gemini API ---
+# 請確保環境變數 GEMINI_API_KEY 已設定，或直接在此填入您的 API Key
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_KEY)
 
@@ -95,7 +96,7 @@ def analyze_big_three():
             data.get('city', 'Hong Kong'), "HK"
         )
         
-        # --- [修改部分開始] 增加星座中英文對照表 ---
+        # 1. 星座中英文對照表 (確保傳入 Prompt 的是中文)
         ZODIAC_CN = {
             "Aries": "白羊座",
             "Taurus": "金牛座",
@@ -111,15 +112,21 @@ def analyze_big_three():
             "Pisces": "雙魚座"
         }
 
-        # 先獲取原始英文名稱，再轉換成中文
-        # 如果字典裡找不到（例如出錯），就用回英文原文，避免程式崩潰
+        # 2. 轉換變數為中文 (若無對應則保留原文)
         sun_sign = ZODIAC_CN.get(user.sun.sign, user.sun.sign)
         moon_sign = ZODIAC_CN.get(user.moon.sign, user.moon.sign)
         asc_sign = ZODIAC_CN.get(user.first_house.sign, user.first_house.sign)
-        # --- [修改部分結束] ---
 
+        # 3. 構建 Prompt：加入【用詞規範】，強制不準簡寫
         prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
+
+【用詞規範】
+1. 請務必使用**完整的星座名稱**，嚴禁使用簡稱。
+2. 錯誤示範：「蟹座」、「羊座」、「瓶座」。
+3. 正確示範：「巨蟹座」、「白羊座」、「水瓶座」。
+4. 特別注意：提到「巨蟹座」時，絕對不可以寫成「蟹座」。
+
 【星盤配置】
 - 太陽：{sun_sign}
 - 月亮：{moon_sign}
