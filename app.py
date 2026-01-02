@@ -3,18 +3,31 @@ import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kerykeion import AstrologicalSubject
+# 引入地理位置工具
+from geopy.geocoders import Nominatim 
 
 app = Flask(__name__)
-# 允許所有來源連線
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# --- 設定 Gemini API ---
-# 請確保環境變數 GEMINI_API_KEY 已設定，或直接在此填入您的 API Key
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_KEY)
-
-# 使用模型
 model = genai.GenerativeModel('gemma-3-27b-it')
+
+# --- 新增：自動搜尋國家代碼的函數 ---
+def get_country_code(city_name):
+    try:
+        # user_agent 係必須嘅，隨便改個名即可
+        geolocator = Nominatim(user_agent="kit_astro_app")
+        location = geolocator.geocode(city_name, language='en')
+        
+        if location:
+            # 取得該地點的詳細資料
+            address = geolocator.reverse(f"{location.latitude}, {location.longitude}", language='en').raw['address']
+            # 取得 ISO 兩位國家代碼 (例如 hk, tw, jp, cn) 並轉大寫
+            return address.get('country_code', 'HK').upper()
+        return "HK" # 搵唔到就預設 HK
+    except:
+        return "HK"
 
 def calculate_custom_aspects(bodies_data):
     aspects = []
@@ -48,11 +61,17 @@ def calculate_custom_aspects(bodies_data):
 def get_data():
     try:
         data = request.json
+        city_input = data.get('city', 'Hong Kong')
+        
+        # 自動偵測國家代碼
+        country_code = get_country_code(city_input)
+        
         user = AstrologicalSubject(
             data.get('name', 'Guest'),
             int(data.get('year')), int(data.get('month')), int(data.get('day')),
             int(data.get('hour')), int(data.get('minute')),
-            data.get('city', 'Hong Kong'), data.get('country', 'HK')
+            city_input, 
+            country_code # 使用自動偵測到的代碼
         )
         
         raw_bodies = [user.sun, user.moon, user.mercury, user.venus, user.mars,
@@ -78,6 +97,7 @@ def get_data():
 
         return jsonify({
             "status": "success",
+            "country_detected": country_code, # 回傳偵測到的國家畀前端知（方便 debug）
             "planets": planets_data,
             "aspects": aspects_data,
             "houses": houses_data
@@ -89,43 +109,35 @@ def get_data():
 def analyze_big_three():
     try:
         data = request.json
+        city_input = data.get('city', 'Hong Kong')
+        
+        # 同樣自動偵測
+        country_code = get_country_code(city_input)
+        
         user = AstrologicalSubject(
             data.get('name', 'Guest'),
             int(data.get('year')), int(data.get('month')), int(data.get('day')),
             int(data.get('hour')), int(data.get('minute')),
-            data.get('city', 'Hong Kong'), "HK"
+            city_input, 
+            country_code
         )
         
-        # 1. 星座中英文對照表 (確保傳入 Prompt 的是中文)
         ZODIAC_CN = {
-            "Aries": "白羊座",
-            "Taurus": "金牛座",
-            "Gemini": "雙子座",
-            "Cancer": "巨蟹座",
-            "Leo": "獅子座",
-            "Virgo": "處女座",
-            "Libra": "天秤座",
-            "Scorpio": "天蠍座",
-            "Sagittarius": "射手座",
-            "Capricorn": "摩羯座",
-            "Aquarius": "水瓶座",
-            "Pisces": "雙魚座"
+            "Aries": "白羊座", "Taurus": "金牛座", "Gemini": "雙子座", "Cancer": "巨蟹座",
+            "Leo": "獅子座", "Virgo": "處女座", "Libra": "天秤座", "Scorpio": "天蠍座",
+            "Sagittarius": "射手座", "Capricorn": "摩羯座", "Aquarius": "水瓶座", "Pisces": "雙魚座"
         }
 
-        # 2. 轉換變數為中文 (若無對應則保留原文)
         sun_sign = ZODIAC_CN.get(user.sun.sign, user.sun.sign)
         moon_sign = ZODIAC_CN.get(user.moon.sign, user.moon.sign)
         asc_sign = ZODIAC_CN.get(user.first_house.sign, user.first_house.sign)
 
-        # 3. 構建 Prompt：加入【用詞規範】，強制不準簡寫
         prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
-
 【用詞規範】
 1. 請務必使用**完整的星座名稱**，嚴禁使用簡稱。
 2. 錯誤示範：「蟹座」、「羊座」、「瓶座」。
 3. 正確示範：「巨蟹座」、「白羊座」、「水瓶座」。
-4. 特別注意：提到「巨蟹座」時，絕對不可以寫成「蟹座」。
 
 【星盤配置】
 - 太陽：{sun_sign}
@@ -151,9 +163,8 @@ def analyze_big_three():
 
 @app.route('/')
 def home():
-    return "Kit Astrology API is Running on Render!", 200
+    return "Kit Astrology API is Running!", 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
-
