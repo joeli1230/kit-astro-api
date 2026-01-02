@@ -4,3 +4,4 @@ kerykeion
 requests
 gunicorn
 google-generativeai
+geopy
