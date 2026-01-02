@@ -3,8 +3,9 @@ import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kerykeion import AstrologicalSubject
-# 引入地理位置工具
-from geopy.geocoders import Nominatim 
+
+# 這裡不再需要 geopy，因為前端會直接傳經緯度過來
+# from geopy.geocoders import Nominatim 
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -13,23 +14,8 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemma-3-27b-it')
 
-# --- 新增：自動搜尋國家代碼的函數 ---
-def get_country_code(city_name):
-    try:
-        # user_agent 係必須嘅，隨便改個名即可
-        geolocator = Nominatim(user_agent="kit_astro_app")
-        location = geolocator.geocode(city_name, language='en')
-        
-        if location:
-            # 取得該地點的詳細資料
-            address = geolocator.reverse(f"{location.latitude}, {location.longitude}", language='en').raw['address']
-            # 取得 ISO 兩位國家代碼 (例如 hk, tw, jp, cn) 並轉大寫
-            return address.get('country_code', 'HK').upper()
-        return "HK" # 搵唔到就預設 HK
-    except:
-        return "HK"
-
 def calculate_custom_aspects(bodies_data):
+    # ... (這部分代碼保持不變，照舊) ...
     aspects = []
     ORB = 8
     IGNORE_KEYWORDS = ["First", "Tenth", "Ascendant", "Midheaven", "House", "Node", "Chiron"]
@@ -61,18 +47,36 @@ def calculate_custom_aspects(bodies_data):
 def get_data():
     try:
         data = request.json
-        city_input = data.get('city', 'Hong Kong')
         
-        # 自動偵測國家代碼
-        country_code = get_country_code(city_input)
-        
-        user = AstrologicalSubject(
-            data.get('name', 'Guest'),
-            int(data.get('year')), int(data.get('month')), int(data.get('day')),
-            int(data.get('hour')), int(data.get('minute')),
-            city_input, 
-            country_code # 使用自動偵測到的代碼
-        )
+        # --- 修改開始 ---
+        # 接收前端傳來的經緯度 (lat, lng)
+        # 如果前端有傳 lat/lng，就用前端的；如果無，就預設用 Hong Kong
+        city_name = data.get('city', 'Hong Kong')
+        lat = data.get('lat')
+        lng = data.get('lng')
+        country_code = data.get('country', 'HK') # 這裡只作顯示用，計算會用 lat/lng
+
+        # 初始化 AstrologicalSubject
+        # 注意：kerykeion 支援直接傳入 lat (緯度) 和 lng (經度)
+        if lat and lng:
+            user = AstrologicalSubject(
+                data.get('name', 'Guest'),
+                int(data.get('year')), int(data.get('month')), int(data.get('day')),
+                int(data.get('hour')), int(data.get('minute')),
+                city=city_name,
+                nation=country_code,
+                lat=float(lat),
+                lng=float(lng) # 直接鎖定經緯度，不再模糊搜尋
+            )
+        else:
+            # 如果前端沒傳座標（舊版兼容），才用舊方法
+            user = AstrologicalSubject(
+                data.get('name', 'Guest'),
+                int(data.get('year')), int(data.get('month')), int(data.get('day')),
+                int(data.get('hour')), int(data.get('minute')),
+                city_name, "HK"
+            )
+        # --- 修改結束 ---
         
         raw_bodies = [user.sun, user.moon, user.mercury, user.venus, user.mars,
                       user.jupiter, user.saturn, user.uranus, user.neptune, user.pluto,
@@ -97,7 +101,7 @@ def get_data():
 
         return jsonify({
             "status": "success",
-            "country_detected": country_code, # 回傳偵測到的國家畀前端知（方便 debug）
+            "location_used": f"{city_name} ({lat}, {lng})", # 回傳確認用的位置
             "planets": planets_data,
             "aspects": aspects_data,
             "houses": houses_data
@@ -109,18 +113,28 @@ def get_data():
 def analyze_big_three():
     try:
         data = request.json
-        city_input = data.get('city', 'Hong Kong')
-        
-        # 同樣自動偵測
-        country_code = get_country_code(city_input)
-        
-        user = AstrologicalSubject(
-            data.get('name', 'Guest'),
-            int(data.get('year')), int(data.get('month')), int(data.get('day')),
-            int(data.get('hour')), int(data.get('minute')),
-            city_input, 
-            country_code
-        )
+        city_name = data.get('city', 'Hong Kong')
+        lat = data.get('lat')
+        lng = data.get('lng')
+        country_code = data.get('country', 'HK')
+
+        if lat and lng:
+            user = AstrologicalSubject(
+                data.get('name', 'Guest'),
+                int(data.get('year')), int(data.get('month')), int(data.get('day')),
+                int(data.get('hour')), int(data.get('minute')),
+                city=city_name,
+                nation=country_code,
+                lat=float(lat),
+                lng=float(lng)
+            )
+        else:
+            user = AstrologicalSubject(
+                data.get('name', 'Guest'),
+                int(data.get('year')), int(data.get('month')), int(data.get('day')),
+                int(data.get('hour')), int(data.get('minute')),
+                city_name, "HK"
+            )
         
         ZODIAC_CN = {
             "Aries": "白羊座", "Taurus": "金牛座", "Gemini": "雙子座", "Cancer": "巨蟹座",
@@ -134,10 +148,7 @@ def analyze_big_three():
 
         prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
-【用詞規範】
-1. 請務必使用**完整的星座名稱**，嚴禁使用簡稱。
-2. 錯誤示範：「蟹座」、「羊座」、「瓶座」。
-3. 正確示範：「巨蟹座」、「白羊座」、「水瓶座」。
+案主出生地：{city_name}
 
 【星盤配置】
 - 太陽：{sun_sign}
