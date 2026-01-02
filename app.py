@@ -52,7 +52,7 @@ def get_data():
             data.get('name', 'Guest'),
             int(data.get('year')), int(data.get('month')), int(data.get('day')),
             int(data.get('hour')), int(data.get('minute')),
-            data.get('city', 'Hong Kong'), "HK"
+            data.get('city', 'Hong Kong'), data.get('country', 'HK')
         )
         
         raw_bodies = [user.sun, user.moon, user.mercury, user.venus, user.mars,
@@ -156,3 +156,4 @@ def home():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
