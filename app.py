@@ -12,7 +12,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemma-4-31b-it')
+model = genai.GenerativeModel('gemma-3-27b-it')
 
 def calculate_custom_aspects(bodies_data):
     # ... (這部分代碼保持不變，照舊) ...
