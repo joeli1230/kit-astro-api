@@ -146,8 +146,8 @@ def analyze_big_three():
         moon_sign = ZODIAC_CN.get(user.moon.sign, user.moon.sign)
         asc_sign = ZODIAC_CN.get(user.first_house.sign, user.first_house.sign)
 
-        prompt = f"""
-你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
+        prompt = f"""[LANGUAGE: TRADITIONAL CHINESE ONLY]
+你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析，嚴禁使用英文。
 案主出生地：{city_name}
 
 【星盤配置】
@@ -155,10 +155,13 @@ def analyze_big_three():
 - 月亮：{moon_sign}
 - 上升：{asc_sign}
 
-【輸出格式要求】
-1. 請「僅輸出」分析內容，不要包含任何前言（如「好的，以下是分析」）或後記。
-2. 嚴格禁止使用任何 Markdown 格式，包括但不限於粗體（**）、標題（#）或清單符號（-）。
-3. 必須嚴格依照以下格式輸出（僅使用 Emoji 和括號作為分隔）：
+【極重要指示】
+1. 只輸出最終分析結果，絕對唔好顯示任何分析過程、思考步驟或中間推論
+2. 唔好輸出 "Sun in Gemini"、"Combination" 等英文分析內容
+3. 唔好輸出 "Check:"、"No Markdown" 等自我檢查文字
+4. 直接開始輸出格式要求嘅內容，唔要有任何前言
+
+【輸出格式 - 嚴格遵守，只輸出呢部分】
 
 🌟 【核心性格分析】
 (請在此分析太陽與上升的結合，約 100 字)
