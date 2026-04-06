@@ -146,7 +146,7 @@ def analyze_big_three():
         moon_sign = ZODIAC_CN.get(user.moon.sign, user.moon.sign)
         asc_sign = ZODIAC_CN.get(user.first_house.sign, user.first_house.sign)
 
-        prompt = f"""
+prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
 案主出生地：{city_name}
 
@@ -156,19 +156,28 @@ def analyze_big_three():
 - 上升：{asc_sign}
 
 【輸出格式要求】
-請嚴格依照以下格式輸出（使用 Emoji 作為標題，不要使用 Markdown）：
+1. 請「僅輸出」分析內容，不要包含任何前言（如「好的，以下是分析」）或後記。
+2. 嚴格禁止使用任何 Markdown 格式，包括但不限於粗體（**）、標題（#）或清單符號（-）。
+3. 必須嚴格依照以下格式輸出（僅使用 Emoji 和括號作為分隔）：
+
 🌟 【核心性格分析】
 (請在此分析太陽與上升的結合，約 100 字)
+
 🌙 【內在情感需求】
 (請在此分析月亮的影響，約 80 字)
+
 🎯 【你的長處】
 1. (長處一)
 2. (長處二)
+
 🎯 【給您的人生建議】
 1. (建議一)
 2. (建議二)
-(結語，一句溫暖的話)
+
+(最後請加上一句溫暖的結語)
 """
+        
+
         response = model.generate_content(prompt)
         return jsonify({"status": "success", "analysis": response.text})
 
