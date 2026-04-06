@@ -146,7 +146,7 @@ def analyze_big_three():
         moon_sign = ZODIAC_CN.get(user.moon.sign, user.moon.sign)
         asc_sign = ZODIAC_CN.get(user.first_house.sign, user.first_house.sign)
 
-prompt = f"""
+        prompt = f"""
 你是一位專業且溫暖的占星師。請根據以下星盤配置，用【繁體中文】為案主進行性格分析。
 案主出生地：{city_name}
 
