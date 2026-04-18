@@ -1,11 +1,12 @@
 import os
+import re
 import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from kerykeion import AstrologicalSubject
 
 # 這裡不再需要 geopy，因為前端會直接傳經緯度過來
-# from geopy.geocoders import Nominatim 
+# from geopy.geocoders import Nominatim
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -13,6 +14,43 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemma-4-26b-a4b-it')
+
+
+# ============================================
+# Gemma 4 輸出清理函數
+# ============================================
+def clean_ai_response_simple(text):
+    """
+    清理 Gemma 4 的多餘思考過程，只保留最終的占星分析結果
+
+    直接找最後一個 🌟【核心性格分析】 開始的完整區塊
+    """
+    # 找所有 🌟 的位置
+    star_positions = [m.start() for m in re.finditer(r'🌟', text)]
+
+    if not star_positions:
+        print("[DEBUG] No 🌟 found, returning original")
+        return text.strip()
+
+    print(f"[DEBUG] Found {len(star_positions)} 🌟 markers")
+
+    # 取最後一個 🌟 之後的內容
+    last_star_pos = star_positions[-1]
+    result = text[last_star_pos:].strip()
+
+    # 清理多餘空白行
+    result = re.sub(r'\n{3,}', '\n\n', result)
+
+    # 移除可能存在的英文結尾檢查（如 "*   Language: Traditional Chinese"）
+    # 如果最後有 "*   Language:" 或 "*   No English" 之類的，刪掉
+    result = re.sub(r'\n\s*\*\s+Language:.*', '', result)
+    result = re.sub(r'\n\s*\*\s+No English.*', '', result)
+    result = re.sub(r'\n\s*\*\s+Length.*', '', result)
+    result = re.sub(r'\n\s*\*\s+Formatting.*', '', result)
+    result = re.sub(r'\n\s*\*\s+Sun \(.*\)\s+accurately.*', '', result)
+
+    return result.strip()
+
 
 def calculate_custom_aspects(bodies_data):
     # ... (這部分代碼保持不變，照舊) ...
@@ -43,11 +81,12 @@ def calculate_custom_aspects(bodies_data):
                 aspects.append({"p1": name1, "p2": name2, "aspect": aspect_name, "orb": round(diff, 2)})
     return aspects
 
+
 @app.route('/api/get-data', methods=['POST'])
 def get_data():
     try:
         data = request.json
-        
+
         # --- 修改開始 ---
         # 接收前端傳來的經緯度 (lat, lng)
         # 如果前端有傳 lat/lng，就用前端的；如果無，就預設用 Hong Kong
@@ -77,7 +116,7 @@ def get_data():
                 city_name, "HK"
             )
         # --- 修改結束 ---
-        
+
         raw_bodies = [user.sun, user.moon, user.mercury, user.venus, user.mars,
                       user.jupiter, user.saturn, user.uranus, user.neptune, user.pluto,
                       user.chiron, user.true_node, user.first_house, user.tenth_house]
@@ -89,14 +128,14 @@ def get_data():
             planets_data.append({
                 "name": mapped_name, "sign": p.sign, "angle": p.abs_pos, "house": p.house
             })
-        
+
         raw_houses = [user.first_house, user.second_house, user.third_house, user.fourth_house,
                       user.fifth_house, user.sixth_house, user.seventh_house, user.eighth_house,
                       user.ninth_house, user.tenth_house, user.eleventh_house, user.twelfth_house]
 
         chinese_house_names = ["第一宮", "第二宮", "第三宮", "第四宮", "第五宮", "第六宮", "第七宮", "第八宮", "第九宮", "第十宮", "第十一宮", "第十二宮"]
         houses_data = [{"id": i+1, "angle": h.abs_pos, "chinese_name": chinese_house_names[i]} for i, h in enumerate(raw_houses)]
-        
+
         aspects_data = calculate_custom_aspects(planets_data)
 
         return jsonify({
@@ -108,6 +147,7 @@ def get_data():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
+
 
 @app.route('/api/analyze-big-three', methods=['POST'])
 def analyze_big_three():
@@ -135,7 +175,7 @@ def analyze_big_three():
                 int(data.get('hour')), int(data.get('minute')),
                 city_name, "HK"
             )
-        
+
         ZODIAC_CN = {
             "Aries": "白羊座", "Taurus": "金牛座", "Gemini": "雙子座", "Cancer": "巨蟹座",
             "Leo": "獅子座", "Virgo": "處女座", "Libra": "天秤座", "Scorpio": "天蠍座",
@@ -175,17 +215,29 @@ def analyze_big_three():
 
 (最後請加上一句溫暖的結語)
 """
-        
 
         response = model.generate_content(prompt)
-        return jsonify({"status": "success", "analysis": response.text})
+
+        # 【重要】清理 Gemma 4 的多餘思考過程，只保留最終分析結果
+        raw_text = response.text
+        print(f"[DEBUG] Raw AI response length: {len(raw_text)}")
+        print(f"[DEBUG] First 200 chars: {raw_text[:200]}")
+
+        cleaned_analysis = clean_ai_response_simple(raw_text)
+
+        print(f"[DEBUG] Cleaned length: {len(cleaned_analysis)}")
+        print(f"[DEBUG] First 100 chars: {cleaned_analysis[:100]}")
+
+        return jsonify({"status": "success", "analysis": cleaned_analysis})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 
+
 @app.route('/')
 def home():
     return "Kit Astrology API is Running!", 200
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
